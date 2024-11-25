@@ -1,0 +1,27 @@
+{
+  "name": "repitnew",
+  "module": ".",
+  "type": "module",
+  "scripts": {
+    "client": "cd client && bun run dev",
+    "server": "cd server && bun run dev",
+    "dev:all": "concurrently \"bun run server\" \"bun run client\"",
+    "install:client": "cd client && bun install",
+    "install:server": "cd server && bun install",
+    "install:all": "npm install && bun run install:client && bun run install:server",
+    "build:client": "cd client && bun run build",
+    "build:server": "cd server && bun run build",
+    "build": "npm run build:server && bun run build:client",
+    "start": "cd server && bun run start"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "concurrently": "^8.2.2"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "date-fns": "^4.1.0"
+  }
+}

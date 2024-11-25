@@ -1,0 +1,442 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DB_URL")
+}
+
+// ======= Базовые типы =======
+enum UserRole {
+  TEACHER
+  ADMIN
+}
+
+enum EntityStatus {
+  ACTIVE
+  ARCHIVED
+  DELETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+}
+
+enum PaymentType {
+  PREPAYMENT
+  REGULAR
+  TRIAL
+}
+
+enum LessonType {
+  REGULAR
+  TRIAL
+  GROUP
+  INDIVIDUAL
+}
+
+// ======= Вспомогательные модели =======
+model File {
+  id          String    @id @default(cuid())
+  name        String
+  path        String    @unique
+  type        String
+  size        Int
+
+  // Отношения
+  user        User      @relation(fields: [userId], references: [id])
+  userId      String
+  students    Student[] @relation("StudentFiles")
+  groups      Group[]   @relation("GroupFiles")
+  lessons     Lesson[]  @relation("LessonFiles")
+  clients     Client[]  @relation("ClientFiles")
+  projects    Project[] @relation("ProjectFiles")
+
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([type])
+}
+
+model Link {
+  id          String    @id @default(cuid())
+  url         String
+  description String?
+
+  // Отношения
+  students    Student[] @relation("StudentLinks")
+  groups      Group[]   @relation("GroupLinks")
+  clients     Client[]  @relation("ClientLinks")
+
+  createdAt   DateTime  @default(now())
+}
+
+model Note {
+  id          String    @id @default(cuid())
+  content     String
+
+  // Отношения
+  student     Student?  @relation(fields: [studentId], references: [id])
+  studentId   String?
+  lesson      Lesson?   @relation(fields: [lessonId], references: [id])
+  lessonId    String?
+  client      Client?   @relation(fields: [clientId], references: [id])
+  clientId    String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([studentId])
+  @@index([lessonId])
+  @@index([clientId])
+}
+
+// ======= Основные модели =======
+model User {
+  id              String    @id @default(cuid())
+  email           String?    @unique
+  password        String?
+  name            String     @unique
+  role            UserRole  @default(TEACHER)
+  status          EntityStatus @default(ACTIVE)
+  storageLimit    Int       @default(104857600) // 100MB в байтах
+  storageUsed     Int       @default(0)         // Использовано байт
+
+  // Отношения
+  students        Student[]
+  groups          Group[]
+  subjects        Subject[]
+  clients         Client[]
+  schedules       Schedule[]
+  files           File[]
+  statistics      Statistics[]
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([email])
+}
+
+model Subject {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  color       String?   // Для отображения в календаре/графиках
+
+  // Отношения
+  schedules   Schedule[]
+  lessons     Lesson[]
+  groups      Group[]
+  teacher     User      @relation(fields: [teacherId], references: [id])
+  teacherId   String
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([teacherId])
+}
+
+model Schedule {
+  id          String    @id @default(cuid())
+  dayOfWeek   Int       // 1-7 (Пн-Вс)
+  startTime   String    // HH:mm формат
+  endTime     String    // HH:mm формат
+
+  // Отношения
+  subject     Subject   @relation(fields: [subjectId], references: [id])
+  subjectId   String
+  group       Group?    @relation(fields: [groupId], references: [id])
+  groupId     String?
+  teacher     User      @relation(fields: [teacherId], references: [id])
+  teacherId   String
+  lessons     Lesson[]
+
+  @@index([teacherId])
+  @@index([groupId])
+  @@index([subjectId])
+}
+
+model Lesson {
+  id          String    @id @default(cuid())
+  date        DateTime
+  startTime   String    // HH:mm формат
+  endTime     String    // HH:mm формат
+  type        LessonType
+  status      EntityStatus @default(ACTIVE)
+
+  // Содержание занятия
+  homework    String?
+  classwork   String?
+  comment     String?
+
+  // Отношения
+  subject     Subject   @relation(fields: [subjectId], references: [id])
+  subjectId   String
+  schedule    Schedule  @relation(fields: [scheduleId], references: [id])
+  scheduleId  String
+  group       Group?    @relation(fields: [groupId], references: [id])
+  groupId     String?
+  students    Student[] @relation("StudentLessons")
+  grades      Grade[]
+  payments    Payment[]
+  files       File[]    @relation("LessonFiles")
+  notes       Note[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([date])
+  @@index([subjectId])
+  @@index([scheduleId])
+  @@index([groupId])
+}
+
+model Group {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  status        EntityStatus @default(ACTIVE)
+
+  // Образовательная информация
+  subject       Subject   @relation(fields: [subjectId], references: [id])
+  subjectId     String
+  level         Int       @default(1)
+
+  // Временные рамки
+  startDate     DateTime
+  endDate       DateTime
+
+  // Финансы
+  lessonPrice   Decimal   @default(0)
+  totalDebt     Decimal   @default(0)
+  totalPaid     Decimal   @default(0)
+  totalExpenses Decimal   @default(0)
+
+  // Отношения
+  teacher       User      @relation(fields: [teacherId], references: [id])
+  teacherId     String
+  students      StudentGroup[]
+  schedules     Schedule[]
+  lessons       Lesson[]
+  files         File[]    @relation("GroupFiles")
+  links         Link[]    @relation("GroupLinks")
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([teacherId])
+  @@index([subjectId])
+}
+
+model Student {
+  id              String    @id @default(cuid())
+  name            String
+  status          EntityStatus @default(ACTIVE)
+
+  // Контактная информация
+  contactName     String?
+  email          String?
+  phone          String?
+  address        String?
+  source         String?
+
+  // Образовательная информация
+  level          Int       @default(1)
+  goals          String?
+  currentProgram String?
+
+  // Финансы
+  balance        Decimal   @default(0)
+  lessonPrice    Decimal   @default(0)
+  totalPaid      Decimal   @default(0)
+  totalDebt      Decimal   @default(0)
+  totalExpenses  Decimal   @default(0)
+
+  // Статистика
+  totalLessons     Int     @default(0)
+  canceledLessons  Int     @default(0)
+  completedLessons Int     @default(0)
+  averageLessonCost Decimal @default(0)
+
+  // Отношения
+  teacher       User      @relation(fields: [teacherId], references: [id])
+  teacherId     String
+  groups        StudentGroup[]
+  lessons       Lesson[]  @relation("StudentLessons")
+  payments      Payment[]
+  files         File[]    @relation("StudentFiles")
+  links         Link[]    @relation("StudentLinks")
+  notes         Note[]
+  grades        Grade[]
+  trialLesson   TrialLesson?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([teacherId])
+  @@index([email])
+  @@index([phone])
+}
+
+model StudentGroup {
+  id        String   @id @default(cuid())
+  student   Student  @relation(fields: [studentId], references: [id])
+  studentId String
+  group     Group    @relation(fields: [groupId], references: [id])
+  groupId   String
+  joinedAt  DateTime @default(now())
+
+  @@unique([studentId, groupId])
+}
+
+model Grade {
+  id        String   @id @default(cuid())
+  value     Int      // 1-5
+  comment   String?
+
+  student   Student  @relation(fields: [studentId], references: [id])
+  studentId String
+  lesson    Lesson   @relation(fields: [lessonId], references: [id])
+  lessonId  String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([studentId])
+  @@index([lessonId])
+}
+
+model TrialLesson {
+  id        String    @id @default(cuid())
+  date      DateTime
+  price     Decimal
+  isPaid    Boolean   @default(false)
+  status    EntityStatus @default(ACTIVE)
+
+  // Отношения
+  student   Student   @relation(fields: [studentId], references: [id])
+  studentId String    @unique
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([studentId])
+}
+
+model Payment {
+  id        String    @id @default(cuid())
+  amount    Decimal
+  type      PaymentType
+  status    PaymentStatus @default(UNPAID)
+  date      DateTime
+
+  // Отношения
+  student   Student  @relation(fields: [studentId], references: [id])
+  studentId String
+  lesson    Lesson?  @relation(fields: [lessonId], references: [id])
+  lessonId  String?
+  client    Client?  @relation(fields: [clientId], references: [id])
+  clientId  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([studentId])
+  @@index([lessonId])
+  @@index([clientId])
+}
+
+model Client {
+  id          String    @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  status      EntityStatus @default(ACTIVE)
+
+  // Отношения
+  teacher     User      @relation(fields: [teacherId], references: [id])
+  teacherId   String
+  projects    Project[]
+  payments    Payment[]
+  files       File[]    @relation("ClientFiles")
+  links       Link[]    @relation("ClientLinks")
+  notes       Note[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([teacherId])
+  @@index([email])
+  @@index([phone])
+}
+
+model Project {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  status      EntityStatus @default(ACTIVE)
+
+  // Финансы
+  totalCost   Decimal
+  paidAmount  Decimal   @default(0)
+
+  // Отношения
+  client      Client    @relation(fields: [clientId], references: [id])
+  clientId    String
+  stages      Stage[]
+  files       File[]    @relation("ProjectFiles")
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([clientId])
+}
+
+model Stage {
+  id          String    @id @default(cuid())
+  name        String
+  status      EntityStatus @default(ACTIVE)
+
+  // Даты
+  startDate   DateTime
+  endDate     DateTime
+
+  // Финансы
+  cost        Decimal
+  paidAmount  Decimal   @default(0)
+
+  // Отношения
+  project     Project   @relation(fields: [projectId], references: [id])
+  projectId   String
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([projectId])
+}
+
+model Statistics {
+  id          String    @id @default(cuid())
+  date        DateTime
+  type        String    // students_finances, students_count, etc.
+  data        Json
+
+  // Фильтры
+  subjectId   String?
+  dateFrom    DateTime
+  dateTo      DateTime
+
+  user        User      @relation(fields: [userId], references: [id])
+  userId      String
+
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([type])
+  @@index([date])
+}
