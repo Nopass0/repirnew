@@ -69,6 +69,10 @@ export function useAuth() {
 
       console.log("Attempting registration with:", data); // Отладочный лог
 
+      if (!data.email) {
+        data.email = "";
+      }
+
       const response = await fetch(`${API_BASE}/register`, {
         method: "POST",
         headers: {
