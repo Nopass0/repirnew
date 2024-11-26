@@ -1,24 +1,45 @@
 // src/index.ts
-import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
-import { authController } from "./controllers/auth.controller";
+import { Elysia } from "elysia";
 import { CONFIG } from "./config/constants";
+import { authController } from "./controllers/auth.controller";
 import { AppError } from "./utils/errors";
 import { logger } from "./utils/logger";
+import { debugMiddleware } from "./middlewares/debug.middleware";
 
+// Добавляем базовый обработчик для корневого маршрута
 const app = new Elysia()
+  .get("/", () => {
+    return {
+      success: true,
+      message: "API is running",
+      timestamp: new Date().toISOString(),
+    };
+  })
   // Настраиваем CORS перед всеми остальными middleware
+  .use(debugMiddleware)
   .use(
     cors({
-      origin: true, // Разрешаем все источники
+      origin: [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://188.120.246.65:3000",
+      ], // Явно указываем разрешенные домены
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
-      allowedHeaders: ["*"],
+      allowedHeaders: ["Content-Type", "Authorization"],
       credentials: true,
     }),
   )
   .group("/api/v1", (app) =>
     app
+      .get("/", () => {
+        return {
+          success: true,
+          message: "API v1 is running",
+          timestamp: new Date().toISOString(),
+        };
+      })
       .use(
         swagger({
           path: "/docs",
@@ -33,6 +54,8 @@ const app = new Elysia()
       .use(authController),
   )
   .onError(({ error, set }) => {
+    logger.error("Error occurred:", error); // Логируем ошибку для отладки
+
     if (error instanceof AppError) {
       set.status = error.statusCode;
       return {
@@ -43,11 +66,14 @@ const app = new Elysia()
       };
     }
 
+    // Добавляем более подробную информацию об ошибке в разработке
+    const isDevelopment = process.env.NODE_ENV === "development";
     set.status = 500;
     return {
       success: false,
-      error: "Internal server error",
+      error: isDevelopment ? error.message : "Internal server error",
       code: "INTERNAL_ERROR",
+      stack: isDevelopment ? error.stack : undefined,
       timestamp: new Date().toISOString(),
     };
   })
@@ -60,3 +86,15 @@ logger.info(`🚀 Server running at http://localhost:${CONFIG.PORT}`);
 logger.info(
   `📚 API docs available at http://localhost:${CONFIG.PORT}/api/v1/docs`,
 );
+
+// Добавляем обработку необработанных исключений
+process.on("uncaughtException", (error) => {
+  logger.error("Uncaught Exception:", error);
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  logger.error("Unhandled Rejection at:", promise, "reason:", reason);
+});
+
+export type App = typeof app;
