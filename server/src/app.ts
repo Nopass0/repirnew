@@ -6,7 +6,6 @@ import { CONFIG } from "./config/constants";
 import { authController } from "./controllers/auth.controller";
 import { AppError } from "./utils/errors";
 import { logger } from "./utils/logger";
-import { debugMiddleware } from "./middlewares/debug.middleware";
 
 // Добавляем базовый обработчик для корневого маршрута
 const app = new Elysia()
@@ -18,7 +17,7 @@ const app = new Elysia()
     };
   })
   // Настраиваем CORS перед всеми остальными middleware
-  .use(debugMiddleware)
+
   .use(
     cors({
       origin: true,
