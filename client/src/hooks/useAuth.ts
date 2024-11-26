@@ -67,11 +67,11 @@ export function useAuth() {
       dispatch(loginStart());
       setIsLoading(true);
 
-      console.log("Attempting registration with:", data); // Отладочный лог
-
-      if (!data.email) {
-        data.email = "";
+      if ("email" in data) {
+        delete data.email;
       }
+
+      console.log("Attempting registration with:", data); // Отладочный лог
 
       const response = await fetch(`${API_BASE}/register`, {
         method: "POST",
