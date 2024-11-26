@@ -21,11 +21,7 @@ const app = new Elysia()
   .use(debugMiddleware)
   .use(
     cors({
-      origin: [
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://188.120.246.65:3000",
-      ], // Явно указываем разрешенные домены
+      origin: true,
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],
       credentials: true,
