@@ -51,10 +51,7 @@ const app = new Elysia()
       timestamp: new Date().toISOString(),
     };
   })
-  .listen({
-    hostname: "0.0.0.0",
-    port: CONFIG.PORT,
-  });
+  .listen(CONFIG.PORT);
 
 logger.info(`🚀 Server running at http://localhost:${CONFIG.PORT}`);
 logger.info(
