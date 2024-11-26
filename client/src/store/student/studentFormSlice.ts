@@ -2,19 +2,26 @@ import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import type { Student, Location, TimeRange } from "@/types/student";
 import type { RootState } from "@/store";
 
+// UUID generation function
+const generateUUID = () => {
+  // This is a RFC4122 version 4 compliant UUID generator
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 // Types for the form state
 interface StudentFormState {
   currentStep: number;
   isEdited: boolean;
   data: {
-    // Basic Info
     name: string;
     contactPerson: string;
     phone: string;
     email: string;
     comment: string;
-
-    // Schedule and Subjects
     subjects: Array<{
       id: string;
       name: string;
@@ -40,8 +47,6 @@ interface StudentFormState {
       };
       location: Location;
     }>;
-
-    // System fields
     createdAt: string;
     updatedAt: string;
     active: boolean;
@@ -86,8 +91,6 @@ export const saveStudentForm = createAsyncThunk(
       body: JSON.stringify(formData),
     });
 
-    console.log(formData);
-
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.message);
@@ -123,7 +126,7 @@ const studentFormSlice = createSlice({
       thirtyDaysLater.setDate(now.getDate() + 30);
 
       state.data.subjects.push({
-        id: crypto.randomUUID(),
+        id: generateUUID(), // Using our custom UUID generator
         name: "",
         level: null,
         trialLesson: {
@@ -183,7 +186,6 @@ const studentFormSlice = createSlice({
       state.isEdited = true;
     },
 
-    // Trial lesson management
     updateTrialLesson: (
       state,
       action: PayloadAction<{
@@ -196,18 +198,14 @@ const studentFormSlice = createSlice({
       const subject = state.data.subjects[subjectIndex];
       if (subject?.trialLesson) {
         subject.trialLesson[field] = value;
-
-        // Автоматически включаем пробное занятие при установке цены
         if (field === "price" && value > 0) {
           subject.trialLesson.enabled = true;
         }
-
         state.isDirty = true;
         state.isEdited = true;
       }
     },
 
-    // Schedule management
     updateSchedule: (
       state,
       action: PayloadAction<{
@@ -228,7 +226,6 @@ const studentFormSlice = createSlice({
       }
     },
 
-    // Form state management
     setFormData: (
       state,
       action: PayloadAction<Partial<StudentFormState["data"]>>,
